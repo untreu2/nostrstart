@@ -100,9 +100,9 @@ async def fetch_all_events(relays: list, pubkey: str) -> list:
         try:
             async with websockets.connect(relay_url) as websocket:
                 sub_id = os.urandom(4).hex()
-                # Request events with kinds from 1 to 99
+                # Request events with kinds from 0 to 40000
                 request = json.dumps([
-                    "REQ", sub_id, {"kinds": list(range(1, 100)), "authors": [pubkey]}
+                    "REQ", sub_id, {"kinds": list(range(0, 40000)), "authors": [pubkey]}
                 ])
                 await websocket.send(request)
 
