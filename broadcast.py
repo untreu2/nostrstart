@@ -2,10 +2,11 @@
 
 import asyncio
 import json
+import os
 from bech32 import bech32_decode, convertbits
 import websockets
 
-# These relays will be used for fetching relay list of the user
+# These relays will be used to fetch the user's relay list (NIP-65)
 POPULAR_RELAYS = [
     "wss://eu.purplerelay.com",
     "wss://nos.lol",
@@ -21,8 +22,8 @@ POPULAR_RELAYS = [
 
 # Relays to which events will be broadcasted
 BROADCAST_TO_RELAYS = [
-    "wss://relay.example.com",
-    "wss://relay.something.com"
+    "wss://relay.primal.net",
+    "ws://localhost:4869",
 ]
 
 def decode_npub(npub: str) -> str:
@@ -40,27 +41,33 @@ def decode_npub(npub: str) -> str:
 
 async def fetch_relay_list(pubkey: str) -> dict:
     """
-    Fetches the user's relay list (NIP-65) and returns it as read/write relays.
+    Fetches the user's relay list (NIP-65) and returns read/write relays.
     """
     for relay_url in POPULAR_RELAYS:
         try:
             async with websockets.connect(relay_url) as websocket:
-                # Fetch relay list event with kind=10002
+                # Generate a dynamic subscription ID
+                sub_id = os.urandom(4).hex()
+                # Request relay list event with kind=10002
                 request = json.dumps([
-                    "REQ", "relay_list", {"kinds": [10002], "authors": [pubkey]}
+                    "REQ", sub_id, {"kinds": [10002], "authors": [pubkey]}
                 ])
                 await websocket.send(request)
 
-                # Read the response
                 relay_list = {"read": [], "write": []}
                 while True:
-                    response = await websocket.recv()
+                    try:
+                        response = await asyncio.wait_for(websocket.recv(), timeout=10)
+                    except asyncio.TimeoutError:
+                        # Exit the loop if no response is received within the timeout
+                        break
+
                     message = json.loads(response)
 
-                    if message[0] == "EVENT" and message[1] == "relay_list":
+                    if message[0] == "EVENT" and message[1] == sub_id:
                         event = message[2]
-                        if event["kind"] == 10002:
-                            for tag in event["tags"]:
+                        if event.get("kind") == 10002:
+                            for tag in event.get("tags", []):
                                 if tag[0] == "r" and len(tag) > 1:
                                     uri = tag[1]
                                     role = tag[2] if len(tag) > 2 else None
@@ -71,12 +78,16 @@ async def fetch_relay_list(pubkey: str) -> dict:
                                     else:
                                         relay_list["read"].append(uri)
                                         relay_list["write"].append(uri)
-                            return relay_list
+                    elif message[0] == "EOSE" and message[1] == sub_id:
+                        break
+
+                if relay_list["read"] or relay_list["write"]:
+                    return relay_list
 
         except Exception as e:
             print(f"Unable to connect to relay {relay_url}: {e}")
 
-    # If no relay provides a list, return the default relays
+    # If no relay provides a relay list, return default relays.
     print("Failed to fetch NIP-65 relay list from any relay. Using default relays.")
     return {"read": POPULAR_RELAYS, "write": POPULAR_RELAYS}
 
@@ -88,21 +99,25 @@ async def fetch_all_events(relays: list, pubkey: str) -> list:
     for relay_url in relays:
         try:
             async with websockets.connect(relay_url) as websocket:
-                # Fetch user events
+                sub_id = os.urandom(4).hex()
+                # Request events with kinds from 1 to 99
                 request = json.dumps([
-                    "REQ", "all_events", {"kinds": list(range(1, 100)), "authors": [pubkey]}
+                    "REQ", sub_id, {"kinds": list(range(1, 100)), "authors": [pubkey]}
                 ])
                 await websocket.send(request)
 
-                # Read the responses
                 while True:
-                    response = await websocket.recv()
+                    try:
+                        response = await asyncio.wait_for(websocket.recv(), timeout=10)
+                    except asyncio.TimeoutError:
+                        break
+
                     message = json.loads(response)
 
-                    if message[0] == "EVENT" and message[1] == "all_events":
+                    if message[0] == "EVENT" and message[1] == sub_id:
                         event = message[2]
                         events.append(event)
-                    elif message[0] == "EOSE":
+                    elif message[0] == "EOSE" and message[1] == sub_id:
                         break
 
         except Exception as e:
@@ -124,7 +139,7 @@ async def publish_to_relay(relay_url: str, events: list):
 
 async def broadcast_events(relays: list, events: list):
     """
-    Broadcasts all events to specified relays in parallel.
+    Broadcasts all events to the specified relays in parallel.
     """
     tasks = [publish_to_relay(relay_url, events) for relay_url in relays]
     await asyncio.gather(*tasks)
@@ -136,7 +151,7 @@ async def main():
         if not npub_input:
             print("Invalid npub key.")
             return
-        
+
         pubkey = decode_npub(npub_input)
         print(f"Public Key: {pubkey}")
 
