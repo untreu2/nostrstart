@@ -1,5 +1,5 @@
 # nostr-utils
-## Install the packages, clone the repo, go into the main folder**
+## Install the packages, clone the repo, go into the main folder
 
 ```
 pip install asyncio jsonlib-python3 bech32 websockets
