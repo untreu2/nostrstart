@@ -1,12 +1,8 @@
 # nostr-utils
-## **1. Install the packages**
+## Install the packages, clone the repo, go into the main folder**
 
 ```
 pip install asyncio jsonlib-python3 bech32 websockets
-```
-
-## Run broadcast.py
-
-```
-python3 broadcast.py
+git clone https://github.com/untreu2/nostr-utils.git
+cd nostr-utils
 ```
