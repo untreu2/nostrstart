@@ -1,5 +1,4 @@
-# nostr better broadcaster
-
+# nostr-utils
 ## **1. Install the packages**
 
 ```
