@@ -1,4 +1,4 @@
-# nostr-utils
+# nostrstart
 ## Install the packages, clone the repo, go into the main folder
 
 ```
