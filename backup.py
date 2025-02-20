@@ -4,6 +4,7 @@ import os
 import datetime
 from bech32 import bech32_decode, convertbits
 import websockets
+from conkey import decode_npub
 
 # Popular relays used to fetch the user's relay list (NIP-65)
 POPULAR_RELAYS = [
@@ -18,18 +19,6 @@ POPULAR_RELAYS = [
     "wss://vitor.nostr1.com",
 ]
 
-def decode_npub(npub: str) -> str:
-    """
-    Decodes an npub key to a hexadecimal public key.
-    """
-    hrp, data = bech32_decode(npub)
-    if hrp != 'npub':
-        raise ValueError("Invalid npub format.")
-    decoded = convertbits(data, 5, 8, False)
-    if decoded is None:
-        raise ValueError("Invalid npub data.")
-    pubkey = bytes(decoded).hex()
-    return pubkey
 
 async def fetch_relay_list(pubkey: str) -> dict:
     """
@@ -141,7 +130,7 @@ async def main():
             print("Invalid npub key.")
             return
 
-        # Decode the npub key to a hexadecimal public key
+        # Decoding npub (using ./conkey.py)
         pubkey = decode_npub(npub_input)
         print(f"Decoded Public Key: {pubkey}")
 
