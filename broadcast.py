@@ -1,5 +1,4 @@
 # pip install asyncio jsonlib-python3 bech32 websockets
-
 import asyncio
 import json
 import os
